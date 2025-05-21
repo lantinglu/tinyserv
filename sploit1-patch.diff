@@ -1,0 +1,73 @@
+diff --git a/target/tinyserv/tinyserv.c b/target/tinyserv/tinyserv.c
+index f8eff69..8c1feac 100644
+--- a/target/tinyserv/tinyserv.c
++++ b/target/tinyserv/tinyserv.c
+@@ -429,16 +429,19 @@ char *get_header( char *packet, struct header *hdr)
+       if (!hdr->is_admin) {
+         /* +2 to account for the last \r\n actually being part of a
+            header. Otherwise our header_len is cutting off early.*/
+         size_t header_len = strstr(packet, "\r\n\r\n") - packet + 2;
+         const char *referer_uri;
+         hdr->referer_len = get_referer(packet, header_len, &referer_uri);
++        if (hdr->referer_len > 256) {
++          hdr->referer_len = 256;
++        }
+         
+         if (hdr->referer_len) {
+-          strncpy(hdr->referer, referer_uri, hdr->referer_len);
+-          hdr->referer[hdr->referer_len + 1] = '\0';
++          strncpy(hdr->referer, referer_uri, hdr->referer_len - 1);
++          hdr->referer[hdr->referer_len - 1] = '\0';
+         }
+ 
+         /* log the admin page request */
+         log_invalid("Unauthorized log read with Referer:",hdr->referer, hdr->referer_len);
+       }
+ 
+@@ -598,12 +601,14 @@ int get_referer(const char *m, size_t m_len, const char **referer_p)
+   char *field_start = strnstr(m, referer, m_len);
+ 
+   if(field_start == NULL)
+     goto no_referer;
+ 
+   size_t max_field_len = (m + m_len) - field_start;
++  if (max_field_len > 256)
++    max_field_len = 256;
+ 
+   char *field_end =
+     strnstr(field_start, "\r\n", max_field_len);
+ 
+   if (field_end == NULL)
+     goto no_referer;
+@@ -617,12 +622,15 @@ int get_referer(const char *m, size_t m_len, const char **referer_p)
+   }
+ 
+   if (uri == field_end)
+     goto no_referer;
+ 
+   referer_len = (int)(field_end - uri);
++  if (referer_len > 256 - 1)
++    referer_len = 256- 1;
++
+   *referer_p = uri;
+   goto done;
+ 
+  no_referer:
+   *referer_p = NULL;
+  done:
+@@ -840,12 +848,15 @@ int file_size(char *file)
+   return (int)st.st_size;
+ }
+ 
+ /* check if file exists */
+ int file_exists(char *file)
+ {
++  if(strstr(file, "..") != 0){
++    return 0;
++  }
+   if (0 == access(file, 0)) {
+     return 1;
+   }
+   return 0;
+ }
+ 

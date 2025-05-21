@@ -1,0 +1,45 @@
+diff --git a/target/tinyserv/tinyserv.c b/target/tinyserv/tinyserv.c
+index f8eff69..6ed6471 100644
+--- a/target/tinyserv/tinyserv.c
++++ b/target/tinyserv/tinyserv.c
+@@ -120,12 +120,13 @@ int file_is_admin_page(char *file);  // determine whether request is for the adm
+ int file_is_login_page(char *file);  // determine whether request is for the login page
+ int auth(char *packet);    // check if username and password are valid admin credentials
+ int make_cookie(uint8_t * buffer);  // generates a new cookie, encodes it in base16, and writes it to buffer
+ char *logout_header();  // generate the header for logout
+ int check_cookie(char *packet, size_t p_len);  // check if cookie is valid for the admin page
+ void cleanup_and_exit(int);  // cleanup memory, and exit (called w/ CTRL+C)
++bool sensitive_file(const char *file_path);
+ 
+ int main(int argc, const char *argv[])
+ {
+   /* parse args */
+   parse_args(argc, argv);
+ 
+@@ -822,14 +823,16 @@ void send_file( char *file_path, char *dynamic)
+     bytes_read = send_data(conn_buffer, bytes_read);
+   }
+ 
+   // Cache this file for future use, if it wasn't too big
+   if (full_file != NULL) {
+     // update cache is now in charge of this buffer, don't free it
++    if(sensitive_file(file_path)){
+       update_cache(file_path, full_file, full_file_bytes);
+     }
++  }
+ 
+   /* close file */
+   close(input_file);
+ }
+ 
+ /* get file size in bytes */
+@@ -1092,6 +1095,9 @@ void cleanup_and_exit(int sig)
+   printf("\nsockets/connections closed...");
+   free(webroot);
+   printf("\ngoodbye!\n");
+   exit(0);
+ }
+ 
++bool sensitive_file(const char *file_path) {
++  return strstr(file_path, "admin.txt") == NULL;
++}
