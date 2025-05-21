@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        #container {
+            display: flex;
+            flex-direction: column;
+            width: 700px;
+            margin: 0 auto;
+            align-items: center;
+            margin-top: 40px;
+        }
+        #container > * {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+  <div id="boof-pic">
+    <img src="pictures/boof.png"
+	 alt="boof the cat in space"
+	 style="height: 15em; margin: 0 auto; align-items: center; display: flex; flex-direction: column;" >
+  </div>
+  <form id="container" onSubmit="login()">
+    <input name="user" placeholder="Username"></input>
+    <input name="password" placeholder="Password" type="password"></input>
+    <button>Log in</button>
+  </form>
+</body>
+<script>
+    function login() {
+        const user = document.querySelector('input[name="user"]').value;
+        const pass = document.querySelector('input[name="password"]').value;
+        window.location.href=`?user=${user}&password=${pass}`;
+    }
+</script>
+</html>
