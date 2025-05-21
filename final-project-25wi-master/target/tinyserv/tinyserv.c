@@ -43,12 +43,20 @@
 #define PASSWORD_CHARS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 #define PASSWORD_LEN 20
 #define MAX_BUFFER_SIZE 4000
-const uint8_t *admin_cookie_key = (char[]) {
-  0x4E, 0x2B, 0xE2, 0x5A, 0xCC, 0x99, 0xA9, 0xAA,
-  0xC6, 0x6F, 0xB6, 0xCE, 0x21, 0x7F, 0x07, 0x1A,
-  0x47, 0x0B, 0xCE, 0x95, 0xB5, 0x3D, 0x6E, 0xD5,
-  0xB4, 0x6D, 0xA7, 0xE9, 0xF4, 0xD6, 0x55, 0x5E
-};
+// const uint8_t *admin_cookie_key = (char[]) {
+//   0x4E, 0x2B, 0xE2, 0x5A, 0xCC, 0x99, 0xA9, 0xAA,
+//   0xC6, 0x6F, 0xB6, 0xCE, 0x21, 0x7F, 0x07, 0x1A,
+//   0x47, 0x0B, 0xCE, 0x95, 0xB5, 0x3D, 0x6E, 0xD5,
+//   0xB4, 0x6D, 0xA7, 0xE9, 0xF4, 0xD6, 0x55, 0x5E
+// };
+#define COOKIE_KEY_FILE "cookie_key.txt"
+#define KEY_LENGTH 32
+
+static uint8_t admin_cookie_key[KEY_LENGTH + 1]; 
+
+void generate_admin_cookie_key();
+void save_cookie_key_to_file(const char *username);
+void load_cookie_key_from_file(const char *username);
 
 /* _____ GLOBALS _____ */
 int sock; // Our socket handle
@@ -131,6 +139,7 @@ int main(int argc, const char *argv[])
 
   /* generate admin password */
   generate_password();
+  load_cookie_key_from_file("admin");
 
   /* print admin password */
   printf("\n------------------------------\n"
@@ -1001,7 +1010,7 @@ int make_cookie(uint8_t * buffer)
   to_sign->authenticated = 1;
   to_sign->expiration = rawtime + COOKIE_VALID_DURATION;
   uint8_t signature[20];
-  hmac_sha1(admin_cookie_key, sizeof(admin_cookie_key),
+  hmac_sha1(admin_cookie_key, KEY_LENGTH,
             (uint8_t *) to_sign, sizeof(cookie_data), (uint8_t *) signature);
   // write cookie data
   int data_size = sizeof(cookie_data);
@@ -1066,7 +1075,7 @@ int check_cookie(char *packet, size_t p_len)
 
   // Compute the HMAC of cookie_data
   uint8_t computed_signature[20];
-  hmac_sha1(admin_cookie_key, sizeof(admin_cookie_key),
+  hmac_sha1(admin_cookie_key, KEY_LENGTH,
             (uint8_t *) cookie, sizeof(cookie_data),
             (uint8_t *) computed_signature);
   free(cookie);
@@ -1095,3 +1104,55 @@ void cleanup_and_exit(int sig)
   exit(0);
 }
 
+void generate_admin_cookie_key() {
+  for (int i = 0; i < KEY_LENGTH; i++) {
+      admin_cookie_key[i] = (uint8_t)uniform_random(256);
+  }
+  admin_cookie_key[KEY_LENGTH] = '\0';
+}
+
+void save_cookie_key_to_file(const char *username) {
+  FILE *file = fopen(COOKIE_KEY_FILE, "a");
+  if (file == NULL) {
+      tinyserv_perror("Could not open cookie key file for writing");
+      return;
+  }
+
+  
+  fprintf(file, "%s:", username);
+  for (int i = 0; i < KEY_LENGTH; i++) {
+      fprintf(file, "%02X", admin_cookie_key[i]);
+  }
+  fprintf(file, "\n");
+
+  fclose(file);
+}
+
+void load_cookie_key_from_file(const char *username) {
+  FILE *file = fopen(COOKIE_KEY_FILE, "r");
+  if (file == NULL) {
+      //if the file does not exist, create a new one
+      generate_admin_cookie_key();
+      save_cookie_key_to_file(username);
+      return;
+  }
+
+  char line[256];
+  while (fgets(line, sizeof(line), file)) {
+      char *file_username = strtok(line, ":");
+      if (file_username && strcmp(file_username, username) == 0) {
+          // find the corresponding username and get its cookie key
+          char *key_hex = strtok(NULL, "\n");
+          for (int i = 0; i < KEY_LENGTH; i++) {
+              sscanf(key_hex + 2 * i, "%02hhX", &admin_cookie_key[i]);
+          }
+          fclose(file);
+          return;
+      }
+  }
+
+  //if the username is not found, generate a new cookie key
+  fclose(file);
+  generate_admin_cookie_key();
+  save_cookie_key_to_file(username);
+}
